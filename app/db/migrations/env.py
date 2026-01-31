@@ -1,5 +1,4 @@
 from logging.config import fileConfig
-
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
@@ -17,8 +16,8 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Use DATABASE_URL from app config instead of alembic.ini
-config.set_main_option("sqlalchemy.url", settings.database_url)
+
+config.set_main_option("sqlalchemy.url", settings.database_url_psycopg2)
 
 
 def run_migrations_offline() -> None:

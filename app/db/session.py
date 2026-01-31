@@ -7,7 +7,7 @@ from app.models.conversion import Conversion
 from app.models.audit_log import AuditLog
 
 engine = create_engine(
-    settings.database_url,
+    settings.database_url_psycopg2,
     pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
