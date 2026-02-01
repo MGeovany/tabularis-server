@@ -17,6 +17,9 @@ class ConversionRepository:
         self._db.refresh(conversion)
         return conversion
 
+    def get_by_id(self, conversion_id: UUID) -> Conversion | None:
+        return self._db.query(Conversion).filter(Conversion.id == conversion_id).first()
+
     def count_by_user(self, user_id: UUID) -> int:
         return self._db.query(func.count(Conversion.id)).filter(Conversion.user_id == user_id).scalar() or 0
 
@@ -35,3 +38,22 @@ class ConversionRepository:
             .limit(limit)
             .all()
         )
+
+    def delete_by_id_and_user(self, conversion_id: UUID, user_id: UUID) -> bool:
+        """Delete conversion if it belongs to user. Returns True if deleted."""
+        row = (
+            self._db.query(Conversion)
+            .filter(Conversion.id == conversion_id, Conversion.user_id == user_id)
+            .first()
+        )
+        if not row:
+            return False
+        self._db.delete(row)
+        self._db.commit()
+        return True
+
+    def delete_all_by_user(self, user_id: UUID) -> int:
+        """Delete all conversions for user. Returns count deleted."""
+        deleted = self._db.query(Conversion).filter(Conversion.user_id == user_id).delete()
+        self._db.commit()
+        return deleted

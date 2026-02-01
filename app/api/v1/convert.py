@@ -21,6 +21,7 @@ from app.repositories.audit_log_repository import AuditLogRepository
 from app.services.conversion import ConversionService, ConversionError
 from app.services.usage_limits import check_can_convert, UsageLimitExceeded
 from app.services.audit import log_audit
+from app.services import download_cache
 
 router = APIRouter()
 
@@ -138,7 +139,40 @@ def pdf_to_excel(
     user_repo.increment_conversions_used(current_user)
     log_audit(audit_repo, user_id, "CONVERSION_SUCCESS", ip=ip, user_agent=user_agent)
 
+    # Allow short-lived re-download from history UI.
+    download_cache.put(conversion_id, xlsx_bytes)
+
     out_name = (filename.rsplit(".", 1)[0] if "." in filename else filename) + ".xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{out_name}"',
+            "X-Conversion-Id": str(conversion_id),
+        },
+    )
+
+
+@router.get("/convert/{conversion_id}/download")
+def download_converted_xlsx(
+    conversion_id: uuid.UUID,
+    current_user: User = Depends(get_or_create_current_user),
+    conversion_repo: ConversionRepository = Depends(get_conversion_repo),
+):
+    """Re-download a recently converted XLSX (short-lived cache)."""
+    conv = conversion_repo.get_by_id(conversion_id)
+    user_id = cast(uuid.UUID, current_user.id)
+    if not conv or cast(uuid.UUID, conv.user_id) != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    xlsx_bytes = download_cache.get(conversion_id)
+    if not xlsx_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Download expired. Please convert the PDF again.",
+        )
+
+    out_name = (conv.filename.rsplit(".", 1)[0] if "." in conv.filename else conv.filename) + ".xlsx"
     return StreamingResponse(
         io.BytesIO(xlsx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
