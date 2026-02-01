@@ -1,12 +1,13 @@
 import io
 import time
 import uuid
+from typing import cast
 from fastapi import APIRouter, Depends, File, HTTPException, Request, status, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
 from app.dependencies import (
-    get_current_user,
+    get_or_create_current_user,
     get_user_repo,
     get_conversion_repo,
     get_audit_repo,
@@ -30,19 +31,20 @@ ALLOWED_CONTENT_TYPE = "application/pdf"
 def pdf_to_excel(
     request: Request,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_or_create_current_user),
     user_repo: UserRepository = Depends(get_user_repo),
     conversion_repo: ConversionRepository = Depends(get_conversion_repo),
     audit_repo: AuditLogRepository = Depends(get_audit_repo),
     conversion_service: ConversionService = Depends(get_conversion_service),
 ):
     """Accept PDF upload, return XLSX stream. Does not store PDF."""
+    user_id = cast(uuid.UUID, current_user.id)
     ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     if "x-forwarded-for" in request.headers:
         ip = request.headers["x-forwarded-for"].split(",")[0].strip()
 
-    log_audit(audit_repo, current_user.id, "CONVERSION_REQUEST", ip=ip, user_agent=user_agent)
+    log_audit(audit_repo, user_id, "CONVERSION_REQUEST", ip=ip, user_agent=user_agent)
     check_can_convert(current_user)
 
     if file.content_type and file.content_type.lower() != ALLOWED_CONTENT_TYPE:
@@ -80,7 +82,7 @@ def pdf_to_excel(
         conversion_repo.create(
             Conversion(
                 id=conversion_id,
-                user_id=current_user.id,
+                user_id=user_id,
                 filename=filename,
                 size_bytes=size_bytes,
                 status=status_str,
@@ -88,7 +90,7 @@ def pdf_to_excel(
                 error_message=error_message,
             )
         )
-        log_audit(audit_repo, current_user.id, "CONVERSION_FAILED", ip=ip, user_agent=user_agent)
+        log_audit(audit_repo, user_id, "CONVERSION_FAILED", ip=ip, user_agent=user_agent)
         if e.code == "FILE_TOO_LARGE" or e.code == "PAGE_LIMIT_EXCEEDED":
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY if e.code == "FILE_TOO_LARGE" else status.HTTP_400_BAD_REQUEST,
@@ -108,7 +110,7 @@ def pdf_to_excel(
         conversion_repo.create(
             Conversion(
                 id=conversion_id,
-                user_id=current_user.id,
+                user_id=user_id,
                 filename=filename,
                 size_bytes=size_bytes,
                 status=status_str,
@@ -116,7 +118,7 @@ def pdf_to_excel(
                 error_message=error_message,
             )
         )
-        log_audit(audit_repo, current_user.id, "CONVERSION_FAILED", ip=ip, user_agent=user_agent)
+        log_audit(audit_repo, user_id, "CONVERSION_FAILED", ip=ip, user_agent=user_agent)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Conversion failed. The PDF may be unsupported or corrupted.",
@@ -125,7 +127,7 @@ def pdf_to_excel(
     conversion_repo.create(
         Conversion(
             id=conversion_id,
-            user_id=current_user.id,
+            user_id=user_id,
             filename=filename,
             size_bytes=size_bytes,
             status=status_str,
@@ -134,7 +136,7 @@ def pdf_to_excel(
         )
     )
     user_repo.increment_conversions_used(current_user)
-    log_audit(audit_repo, current_user.id, "CONVERSION_SUCCESS", ip=ip, user_agent=user_agent)
+    log_audit(audit_repo, user_id, "CONVERSION_SUCCESS", ip=ip, user_agent=user_agent)
 
     out_name = (filename.rsplit(".", 1)[0] if "." in filename else filename) + ".xlsx"
     return StreamingResponse(
