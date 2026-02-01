@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # CORS (comma-separated origins, e.g. http://localhost:3000,https://app.tabular.com)
     cors_origins: str = "http://localhost:3000"
 
+    # Optional regex for dynamic origins (e.g. Vercel preview domains)
+    cors_origin_regex: str | None = None
+
     # PDF limits
     max_pdf_bytes: int = 25 * 1024 * 1024  # 25 MB
     max_pdf_pages: int = 50
