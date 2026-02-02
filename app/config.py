@@ -32,7 +32,11 @@ class Settings(BaseSettings):
 
     # PDF limits
     max_pdf_bytes: int = 25 * 1024 * 1024  # 25 MB
-    max_pdf_pages: int = 50
+    # Absolute max pages accepted by the server (all plans)
+    max_pdf_pages: int = 200
+
+    # Plan limits (FREE)
+    free_max_pdf_pages: int = 20
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -6,7 +6,8 @@ from abc import ABC, abstractmethod
 import pdfplumber
 
 # Type: list of pages, each page = list of tables, each table = list of rows, each row = list of cells
-TablesByPage = list[list[list[list[str | None]]]]
+TablesOnPage = list[list[list[str | None]]]
+TablesByPageNumber = list[tuple[int, TablesOnPage]]
 
 
 class TableExtractorStrategy(ABC):
@@ -18,8 +19,8 @@ class TableExtractorStrategy(ABC):
         ...
 
     @abstractmethod
-    def extract_tables(self, content: bytes) -> TablesByPage:
-        """Extract tables from PDF bytes. Returns one list per page, each with list of tables (rows of cells)."""
+    def extract_tables(self, content: bytes, pages: list[int] | None = None) -> TablesByPageNumber:
+        """Extract tables from PDF bytes. Returns (page_number, tables) tuples."""
         ...
 
 
@@ -30,10 +31,16 @@ class PdfplumberTableExtractor(TableExtractorStrategy):
         with pdfplumber.open(io.BytesIO(content)) as pdf:
             return len(pdf.pages)
 
-    def extract_tables(self, content: bytes) -> TablesByPage:
-        result: TablesByPage = []
+    def extract_tables(self, content: bytes, pages: list[int] | None = None) -> TablesByPageNumber:
+        result: TablesByPageNumber = []
         with pdfplumber.open(io.BytesIO(content)) as pdf:
-            for page in pdf.pages:
-                tables = page.extract_tables()
-                result.append(tables or [])
+            if pages:
+                for page_num in pages:
+                    page = pdf.pages[page_num - 1]
+                    tables = page.extract_tables()
+                    result.append((page_num, tables or []))
+            else:
+                for page_num, page in enumerate(pdf.pages, start=1):
+                    tables = page.extract_tables()
+                    result.append((page_num, tables or []))
         return result

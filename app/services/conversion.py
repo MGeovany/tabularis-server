@@ -4,7 +4,7 @@ import io
 import time
 
 from app.config import settings
-from app.strategies.table_extraction import TableExtractorStrategy
+from app.strategies.table_extraction import TableExtractorStrategy, TablesByPageNumber
 from app.builders.excel_builder import ExcelExportBuilder
 
 
@@ -22,6 +22,9 @@ class ConversionService:
 
     def __init__(self, table_extractor: TableExtractorStrategy) -> None:
         self._extractor = table_extractor
+
+    def get_page_count(self, content: bytes) -> int:
+        return self._extractor.get_page_count(content)
 
     def validate_pdf(
         self,
@@ -43,7 +46,7 @@ class ConversionService:
         if not content or len(content) < 100:
             raise ConversionError("File is empty or too small to be a valid PDF.", "PDF_CORRUPTED")
         try:
-            num_pages = self._extractor.get_page_count(content)
+            num_pages = self.get_page_count(content)
         except Exception as e:
             raise ConversionError("Unsupported or corrupted PDF.", "PDF_CORRUPTED") from e
         if max_pages is None:
@@ -59,6 +62,7 @@ class ConversionService:
         content: bytes,
         filename: str,
         content_type: str | None = "application/pdf",
+        pages: list[int] | None = None,
     ) -> tuple[bytes, float]:
         """
         Validate PDF, extract tables (Strategy), build XLSX (Builder).
@@ -66,10 +70,10 @@ class ConversionService:
         """
         self.validate_pdf(content, content_type)
         start = time.perf_counter()
-        tables_by_page = self._extractor.extract_tables(content)
+        tables_by_page: TablesByPageNumber = self._extractor.extract_tables(content, pages=pages)
         builder = ExcelExportBuilder()
         sheet_count = 0
-        for page_num, tables in enumerate(tables_by_page, start=1):
+        for page_num, tables in tables_by_page:
             if not tables:
                 continue
             builder.add_sheet(f"Page {page_num}")

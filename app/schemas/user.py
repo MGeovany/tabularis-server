@@ -9,6 +9,7 @@ class UserMe(BaseModel):
     plan: str
     conversions_used: int
     conversions_limit: int
+    reset_at: datetime
     created_at: datetime | None
 
     model_config = {"from_attributes": True}

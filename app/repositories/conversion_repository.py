@@ -1,5 +1,6 @@
 """Repository: data access for Conversion."""
 
+from datetime import datetime
 from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -22,6 +23,18 @@ class ConversionRepository:
 
     def count_by_user(self, user_id: UUID) -> int:
         return self._db.query(func.count(Conversion.id)).filter(Conversion.user_id == user_id).scalar() or 0
+
+    def count_success_by_user_since(self, user_id: UUID, since: datetime) -> int:
+        return (
+            self._db.query(func.count(Conversion.id))
+            .filter(
+                Conversion.user_id == user_id,
+                Conversion.status == "success",
+                Conversion.created_at >= since,
+            )
+            .scalar()
+            or 0
+        )
 
     def list_by_user(
         self,
