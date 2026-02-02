@@ -1,4 +1,4 @@
-.PHONY: run server install migrate migrate-up migrate-down help
+.PHONY: run server install migrate migrate-up migrate-down ci test
 
 # Prefer venv if present, else uv run
 VENV := .venv
@@ -17,6 +17,13 @@ server: run
 
 install:
 	uv venv && uv pip install -e .
+
+test:
+	uv run pytest
+
+ci:
+	uv run python -m compileall -q app
+	uv run pytest -q
 
 migrate: migrate-up
 
