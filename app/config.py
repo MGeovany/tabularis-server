@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # PDF limits
     max_pdf_bytes: int = 25 * 1024 * 1024  # 25 MB
     # Absolute max pages accepted by the server (all plans)
+    # NOTE: "Unlimited" for Pro is enforced by plan rules; this is still a safety cap.
     max_pdf_pages: int = 200
 
     # Plan limits (FREE)
